@@ -1,0 +1,45 @@
+# Data Analysis
+pandas
+numpy
+openpyxl
+xlrd
+
+# Visualization
+matplotlib
+seaborn
+plotly
+
+# Machine Learning
+
+
+# AI / LLM
+langchain
+langchain-core
+langchain-community
+langchain-openai
+langgraph
+
+# OpenAI
+openai
+
+# Hugging Face (optional)
+huggingface-hub
+transformers
+
+# Data & File Processing
+
+
+# Web / API
+requests
+httpx
+
+torchvision
+
+langchain-google-genai
+
+
+# Streamlit UI
+streamlit
+
+# Environment Variables
+python-dotenv
