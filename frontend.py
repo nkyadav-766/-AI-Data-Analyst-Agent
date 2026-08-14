@@ -1,8 +1,7 @@
-import streamlit as st
-import uuid
 import os
-import re
+import uuid
 
+import streamlit as st
 
 from agent import chat
 
@@ -40,93 +39,6 @@ if "uploaded_file_path" not in st.session_state:
 
 
 # ============================================================
-# FUNCTION: EXTRACT CHART PATHS
-# ============================================================
-
-def extract_chart_paths(text):
-
-    if not isinstance(
-        text,
-        str
-    ):
-
-        return []
-
-
-    # Search for:
-    #
-    # CHART_GENERATED: charts/chart_xxxxx.png
-
-    pattern = (
-        r"CHART_GENERATED:\s*"
-        r"([^\s]+\.png)"
-    )
-
-
-    paths = re.findall(
-        pattern,
-        text
-    )
-
-
-    valid_paths = []
-
-
-    for path in paths:
-
-        path = path.strip()
-
-        path = path.rstrip(
-            ".,);]}"
-        )
-
-        path = path.replace(
-            "\\",
-            os.sep
-        )
-
-
-        if os.path.exists(
-            path
-        ):
-
-            valid_paths.append(
-                path
-            )
-
-
-    return list(
-        dict.fromkeys(
-            valid_paths
-        )
-    )
-
-
-# ============================================================
-# FUNCTION: REMOVE CHART MARKER FROM TEXT
-# ============================================================
-
-def clean_answer(text):
-
-    if not isinstance(
-        text,
-        str
-    ):
-
-        return str(text)
-
-
-    cleaned = re.sub(
-        r"CHART_GENERATED:\s*[^\s]+\.png",
-        "",
-        text
-    )
-
-
-    return cleaned.strip()
-
-
-# ============================================================
 # SIDEBAR
 # ============================================================
 
@@ -140,19 +52,17 @@ with st.sidebar:
 
 
     # ========================================================
-    # UPLOAD CSV
+    # UPLOAD
     # ========================================================
 
     st.subheader(
         "📁 Upload CSV"
     )
 
-
     uploaded_file = st.file_uploader(
         "Choose your CSV file",
         type=["csv"]
     )
-
 
     if uploaded_file is not None:
 
@@ -161,12 +71,10 @@ with st.sidebar:
             exist_ok=True
         )
 
-
         file_path = os.path.join(
             "data",
             uploaded_file.name
         )
-
 
         with open(
             file_path,
@@ -177,11 +85,9 @@ with st.sidebar:
                 uploaded_file.getbuffer()
             )
 
-
         st.session_state.uploaded_file_path = (
             file_path
         )
-
 
         st.success(
             f"✅ {uploaded_file.name}"
@@ -199,25 +105,26 @@ with st.sidebar:
         "🛠️ Features"
     )
 
-
     st.markdown(
         """
-        📂 CSV Analysis
+📂 CSV Analysis
 
-        🔍 Column Inspection
+🔍 Column Inspection
 
-        🧹 Missing Values
+🧹 Missing Values
 
-        📊 Statistical Summary
+📊 Statistical Summary
 
-        📈 Correlation Analysis
+📈 Correlation Analysis
 
-        👥 Churn Rate
+📊 Visualizations
 
-        📊 Visualizations
+🧹 Data Cleaning
 
-        💬 AI Chat
-        """
+💡 Insights
+
+🤖 AI Data Questions
+"""
     )
 
 
@@ -225,48 +132,43 @@ with st.sidebar:
 
 
     # ========================================================
-    # EXAMPLE QUESTIONS
+    # EXAMPLES
     # ========================================================
 
     st.subheader(
         "💡 Example Questions"
     )
 
-
     st.markdown(
         """
-        **Chat**
+**Summary**
 
-        Hello, what can you do?
+Give me a summary of my dataset.
 
-        **Dataset**
+**Missing Values**
 
-        What columns are in my dataset?
+Show missing values.
 
-        **Statistics**
+**Statistics**
 
-        Give me the statistical summary.
+Give me important statistics.
 
-        **Churn**
+**Visualization**
 
-        Calculate the churn rate.
+Create a histogram of study time.
 
-        **Visualization**
+**Visualization**
 
-        Generate a pie chart of churn.
+Create a bar chart of gender.
 
-        **Visualization**
+**Visualization**
 
-        Generate a histogram of age.
+Create a scatter plot of study time vs previous grade.
 
-        **Visualization**
+**Analysis**
 
-        Create a scatter plot of balance vs estimated salary.
-
-        **Text + Chart**
-
-        Analyze churn and visualize it.
-        """
+What are the most important insights?
+"""
     )
 
 
@@ -292,16 +194,16 @@ with st.sidebar:
 
 
 # ============================================================
-# MAIN HEADER
+# HEADER
 # ============================================================
 
 st.title(
     "🤖 AI Data Analyst Agent"
 )
 
-
 st.write(
-    "Upload a CSV file and ask questions about your dataset."
+    "Upload a CSV file and ask questions "
+    "about your dataset."
 )
 
 
@@ -335,63 +237,41 @@ for message in st.session_state.messages:
         message["role"]
     ):
 
-        content = message["content"]
-
-
         # ----------------------------------------------------
-        # DISPLAY TEXT
+        # TEXT
         # ----------------------------------------------------
 
-        cleaned_content = clean_answer(
-            content
+        content = message.get(
+            "content",
+            ""
         )
 
-
-        if cleaned_content:
+        if content:
 
             st.markdown(
-                cleaned_content
+                content
             )
 
 
         # ----------------------------------------------------
-        # DISPLAY CHARTS
+        # CHARTS
         # ----------------------------------------------------
 
-        chart_paths = extract_chart_paths(
-            content
+        charts = message.get(
+            "charts",
+            []
         )
 
+        for chart_path in charts:
 
-        for chart_path in chart_paths:
+            if os.path.exists(
+                chart_path
+            ):
 
-            st.image(
-                chart_path,
-                caption="📊 Generated Visualization",
-                use_container_width=True
-            )
-
-
-            with open(
-                chart_path,
-                "rb"
-            ) as chart_file:
-
-                st.download_button(
-                    label="⬇️ Download Chart",
-                    data=chart_file.read(),
-                    file_name=os.path.basename(
-                        chart_path
-                    ),
-                    mime="image/png",
-                    key=(
-                        "history_"
-                        + chart_path
-                        + "_"
-                        + str(
-                            uuid.uuid4()
-                        )
-                    )
+                st.image(
+                    chart_path,
+                    caption="📊 Generated Visualization",
+                    use_container_width=True
                 )
 
 
@@ -405,26 +285,25 @@ user_input = st.chat_input(
 
 
 # ============================================================
-# PROCESS MESSAGE
+# PROCESS USER MESSAGE
 # ============================================================
 
 if user_input:
 
     # ========================================================
-    # SAVE USER MESSAGE
+    # USER MESSAGE
     # ========================================================
+
+    user_message = {
+        "role": "user",
+        "content": user_input,
+        "charts": []
+    }
 
     st.session_state.messages.append(
-        {
-            "role": "user",
-            "content": user_input
-        }
+        user_message
     )
 
-
-    # ========================================================
-    # DISPLAY USER MESSAGE
-    # ========================================================
 
     with st.chat_message(
         "user"
@@ -444,122 +323,102 @@ if user_input:
     ):
 
         with st.spinner(
-            "🤖 Agent is analyzing..."
+            "🤖 Analyzing your data..."
         ):
 
             try:
 
-                # ====================================================
-                # BUILD MESSAGE
-                # ====================================================
+                # =================================================
+                # CREATE CLEAN INTERNAL MESSAGE
+                # =================================================
 
-                if (
-                    st.session_state
-                    .uploaded_file_path
-                ):
+                if st.session_state.uploaded_file_path:
 
-                    message = f"""
-The user uploaded this CSV file:
-
-{st.session_state.uploaded_file_path}
-
-User question:
-
-{user_input}
-
-Use this CSV file when dataset analysis is required.
-
-If the user requests a chart, visualization,
-graph, plot, or image of the data,
-use the generate_chart tool.
-"""
+                    message = (
+                        "CSV_PATH="
+                        + st.session_state.uploaded_file_path
+                        + "\n\n"
+                        + "USER_QUESTION="
+                        + user_input
+                    )
 
                 else:
 
-                    message = user_input
+                    message = (
+                        "USER_QUESTION="
+                        + user_input
+                    )
 
 
-                # ====================================================
+                # =================================================
                 # CALL AGENT
-                # ====================================================
+                # =================================================
 
-                answer = chat(
+                result = chat(
                     message,
                     st.session_state.thread_id
                 )
 
 
-                # ====================================================
-                # CLEAN TEXT
-                # ====================================================
+                # =================================================
+                # GET RESPONSE
+                # =================================================
 
-                cleaned_answer = clean_answer(
-                    answer
+                answer = result.get(
+                    "text",
+                    ""
+                )
+
+                charts = result.get(
+                    "charts",
+                    []
                 )
 
 
-                # ====================================================
+                # =================================================
                 # DISPLAY TEXT
-                # ====================================================
+                # =================================================
 
-                if cleaned_answer:
+                if answer:
 
                     st.markdown(
-                        cleaned_answer
+                        answer
                     )
 
 
-                # ====================================================
-                # FIND CHARTS
-                # ====================================================
-
-                chart_paths = extract_chart_paths(
-                    answer
-                )
-
-
-                # ====================================================
+                # =================================================
                 # DISPLAY CHARTS
-                # ====================================================
+                # =================================================
 
-                for chart_path in chart_paths:
+                for chart_path in charts:
 
-                    st.image(
-                        chart_path,
-                        caption="📊 Generated Visualization",
-                        use_container_width=True
-                    )
+                    if os.path.exists(
+                        chart_path
+                    ):
 
+                        st.image(
+                            chart_path,
+                            caption="📊 Generated Visualization",
+                            use_container_width=True
+                        )
 
-                    with open(
-                        chart_path,
-                        "rb"
-                    ) as chart_file:
+                    else:
 
-                        st.download_button(
-                            label="⬇️ Download Chart",
-                            data=chart_file.read(),
-                            file_name=os.path.basename(
-                                chart_path
-                            ),
-                            mime="image/png",
-                            key=(
-                                "new_"
-                                + str(
-                                    uuid.uuid4()
-                                )
-                            )
+                        st.warning(
+                            "Generated chart file "
+                            "could not be found."
                         )
 
 
-                # ====================================================
-                # SAVE ASSISTANT MESSAGE
-                # ====================================================
+                # =================================================
+                # SAVE RESPONSE
+                # =================================================
 
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
-                        "content": answer
+                        "content": answer,
+                        "charts": charts
                     }
                 )
 
@@ -571,15 +430,14 @@ use the generate_chart tool.
                     + str(e)
                 )
 
-
                 st.error(
                     error
                 )
 
-
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
-                        "content": error
+                        "content": error,
+                        "charts": []
                     }
                 )

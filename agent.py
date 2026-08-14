@@ -1,4 +1,5 @@
 import os
+import re
 
 from dotenv import load_dotenv
 
@@ -8,12 +9,14 @@ from langchain_huggingface import (
 )
 
 from langchain.agents import create_agent
+
 from langgraph.checkpoint.memory import InMemorySaver
 
 from tools import (
     load_csv,
     dataset_summary,
     get_column_info,
+    get_missing_values,
     calculate_churn_rate,
     get_correlation,
     generate_chart,
@@ -23,7 +26,7 @@ from system_message import SYSTEM_MESSAGE
 
 
 # ============================================================
-# LOAD ENVIRONMENT VARIABLES
+# ENVIRONMENT
 # ============================================================
 
 load_dotenv()
@@ -33,21 +36,21 @@ HUGGINGFACE_API_KEY = os.getenv(
 )
 
 if not HUGGINGFACE_API_KEY:
+
     raise ValueError(
-        "HUGGINGFACE_API_KEY is missing. "
-        "Add it to your .env file."
+        "HUGGINGFACE_API_KEY is missing."
     )
 
 
 # ============================================================
-# CREATE HUGGING FACE MODEL
+# MODEL
 # ============================================================
 
 llm = HuggingFaceEndpoint(
     repo_id="openai/gpt-oss-20b",
     huggingfacehub_api_token=HUGGINGFACE_API_KEY,
     temperature=0,
-    max_new_tokens=1024,
+    max_new_tokens=2048,
 )
 
 chat_model = ChatHuggingFace(
@@ -63,6 +66,7 @@ tools = [
     load_csv,
     dataset_summary,
     get_column_info,
+    get_missing_values,
     calculate_churn_rate,
     get_correlation,
     generate_chart,
@@ -77,7 +81,7 @@ memory = InMemorySaver()
 
 
 # ============================================================
-# CREATE AGENT
+# AGENT
 # ============================================================
 
 agent = create_agent(
@@ -89,7 +93,83 @@ agent = create_agent(
 
 
 # ============================================================
-# CHAT FUNCTION
+# EXTRACT CHART PATH
+# ============================================================
+
+def extract_chart_paths(messages):
+
+    charts = []
+
+    for message in messages:
+
+        content = getattr(
+            message,
+            "content",
+            ""
+        )
+
+        if not isinstance(
+            content,
+            str
+        ):
+
+            continue
+
+        matches = re.findall(
+            r"CHART_PATH:(.+)",
+            content
+        )
+
+        for path in matches:
+
+            path = path.strip()
+
+            if path not in charts:
+
+                charts.append(path)
+
+    return charts
+
+
+# ============================================================
+# CLEAN RESPONSE
+# ============================================================
+
+def clean_response(text):
+
+    if not text:
+
+        return ""
+
+    # Remove internal chart path markers
+    text = re.sub(
+        r"CHART_PATH:.*",
+        "",
+        text
+    )
+
+    # Remove accidental internal instructions
+    text = re.sub(
+        r"The user uploaded this CSV file:.*",
+        "",
+        text,
+        flags=re.DOTALL
+    )
+
+    text = re.sub(
+        r"User question:.*",
+        "",
+        text,
+        flags=re.DOTALL
+    )
+
+    text = text.strip()
+
+    return text
+
+
+# ============================================================
+# CHAT
 # ============================================================
 
 def chat(
@@ -102,7 +182,7 @@ def chat(
             "messages": [
                 {
                     "role": "user",
-                    "content": user_message,
+                    "content": user_message
                 }
             ]
         },
@@ -113,48 +193,89 @@ def chat(
         },
     )
 
-    content = response["messages"][-1].content
+    messages = response.get(
+        "messages",
+        []
+    )
 
+    if not messages:
+
+        return {
+            "text": "No response generated.",
+            "charts": []
+        }
 
     # ========================================================
-    # STRING RESPONSE
+    # CHARTS
     # ========================================================
 
-    if isinstance(content, str):
-
-        return content
-
+    charts = extract_chart_paths(
+        messages
+    )
 
     # ========================================================
-    # LIST RESPONSE
+    # FINAL MESSAGE
     # ========================================================
 
-    if isinstance(content, list):
+    final_content = messages[-1].content
+
+    if isinstance(
+        final_content,
+        str
+    ):
+
+        answer = final_content
+
+    elif isinstance(
+        final_content,
+        list
+    ):
 
         text_parts = []
 
-        for item in content:
+        for item in final_content:
 
-            if isinstance(item, dict):
-
-                if item.get("type") == "text":
-
-                    text_parts.append(
-                        item.get("text", "")
-                    )
-
-            elif isinstance(item, str):
+            if isinstance(
+                item,
+                str
+            ):
 
                 text_parts.append(item)
 
-        return "\n".join(text_parts)
+            elif isinstance(
+                item,
+                dict
+            ):
 
+                text = item.get(
+                    "text",
+                    ""
+                )
 
-    # ========================================================
-    # FALLBACK
-    # ========================================================
+                if text:
 
-    return str(content)
+                    text_parts.append(
+                        text
+                    )
+
+        answer = "\n".join(
+            text_parts
+        )
+
+    else:
+
+        answer = str(
+            final_content
+        )
+
+    answer = clean_response(
+        answer
+    )
+
+    return {
+        "text": answer,
+        "charts": charts
+    }
 
 
 # ============================================================
@@ -174,11 +295,15 @@ if __name__ == "__main__":
 
     while True:
 
-        user_input = input("You: ")
+        user_input = input(
+            "You: "
+        )
 
         if user_input.lower().strip() == "exit":
 
-            print("Agent: Goodbye!")
+            print(
+                "Agent: Goodbye!"
+            )
 
             break
 
@@ -188,18 +313,38 @@ if __name__ == "__main__":
 
         try:
 
-            answer = chat(
+            result = chat(
                 user_input
             )
 
             print()
             print("Agent:")
-            print(answer)
+            print(
+                result["text"]
+            )
+
+            if result["charts"]:
+
+                print()
+                print(
+                    "Charts:"
+                )
+
+                for chart in result["charts"]:
+
+                    print(
+                        chart
+                    )
+
             print()
 
         except Exception as e:
 
             print()
-            print("Error:")
+            print(
+                "Error:"
+            )
+
             print(e)
+
             print()
