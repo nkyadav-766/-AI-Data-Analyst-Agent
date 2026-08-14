@@ -1,7 +1,12 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+
+from langchain_huggingface import (
+    HuggingFaceEndpoint,
+    ChatHuggingFace
+)
+
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -11,6 +16,7 @@ from tools import (
     get_column_info,
     calculate_churn_rate,
     get_correlation,
+    generate_chart,
 )
 
 from system_message import SYSTEM_MESSAGE
@@ -22,18 +28,9 @@ from system_message import SYSTEM_MESSAGE
 
 load_dotenv()
 
-import os
-
-from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
-
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
-
-load_dotenv()
-
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+HUGGINGFACE_API_KEY = os.getenv(
+    "HUGGINGFACE_API_KEY"
+)
 
 if not HUGGINGFACE_API_KEY:
     raise ValueError(
@@ -57,6 +54,7 @@ chat_model = ChatHuggingFace(
     llm=llm
 )
 
+
 # ============================================================
 # TOOLS
 # ============================================================
@@ -67,6 +65,7 @@ tools = [
     get_column_info,
     calculate_churn_rate,
     get_correlation,
+    generate_chart,
 ]
 
 
@@ -82,7 +81,7 @@ memory = InMemorySaver()
 # ============================================================
 
 agent = create_agent(
-    model=llm,
+    model=chat_model,
     tools=tools,
     system_prompt=SYSTEM_MESSAGE,
     checkpointer=memory,
@@ -93,7 +92,10 @@ agent = create_agent(
 # CHAT FUNCTION
 # ============================================================
 
-def chat(user_message, thread_id="user-1"):
+def chat(
+    user_message,
+    thread_id="user-1"
+):
 
     response = agent.invoke(
         {
@@ -113,7 +115,20 @@ def chat(user_message, thread_id="user-1"):
 
     content = response["messages"][-1].content
 
-    # Gemini can sometimes return content as a list
+
+    # ========================================================
+    # STRING RESPONSE
+    # ========================================================
+
+    if isinstance(content, str):
+
+        return content
+
+
+    # ========================================================
+    # LIST RESPONSE
+    # ========================================================
+
     if isinstance(content, list):
 
         text_parts = []
@@ -134,48 +149,57 @@ def chat(user_message, thread_id="user-1"):
 
         return "\n".join(text_parts)
 
-    return content
+
+    # ========================================================
+    # FALLBACK
+    # ========================================================
+
+    return str(content)
 
 
 # ============================================================
-# MAIN PROGRAM
+# TERMINAL TEST
 # ============================================================
 
 if __name__ == "__main__":
 
     print("=" * 60)
-    print("AI DATA ANALYST AGENT - GOOGLE GEMINI")
+    print("AI DATA ANALYST AGENT")
     print("=" * 60)
 
-    print("\nAgent is ready.")
-    print("Type 'exit' to stop.\n")
+    print()
+    print("Agent is ready.")
+    print("Type 'exit' to stop.")
+    print()
 
     while True:
 
         user_input = input("You: ")
 
-        # Exit
         if user_input.lower().strip() == "exit":
 
             print("Agent: Goodbye!")
 
             break
 
-        # Ignore empty input
         if not user_input.strip():
 
             continue
 
         try:
 
-            answer = chat(user_input)
+            answer = chat(
+                user_input
+            )
 
-            print("\nAgent:")
+            print()
+            print("Agent:")
             print(answer)
             print()
 
         except Exception as e:
 
-            print("\nError:")
+            print()
+            print("Error:")
             print(e)
             print()
