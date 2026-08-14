@@ -22,25 +22,40 @@ from system_message import SYSTEM_MESSAGE
 
 load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+import os
 
-if not GOOGLE_API_KEY:
+from dotenv import load_dotenv
+from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
+
+# ============================================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================================
+
+load_dotenv()
+
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+
+if not HUGGINGFACE_API_KEY:
     raise ValueError(
-        "GOOGLE_API_KEY is missing. "
+        "HUGGINGFACE_API_KEY is missing. "
         "Add it to your .env file."
     )
 
 
 # ============================================================
-# CREATE GEMINI MODEL
+# CREATE HUGGING FACE MODEL
 # ============================================================
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-3-flash-preview",
+llm = HuggingFaceEndpoint(
+    repo_id="openai/gpt-oss-20b",
+    huggingfacehub_api_token=HUGGINGFACE_API_KEY,
     temperature=0,
-    google_api_key=GOOGLE_API_KEY,
+    max_new_tokens=1024,
 )
 
+chat_model = ChatHuggingFace(
+    llm=llm
+)
 
 # ============================================================
 # TOOLS
